@@ -130,9 +130,16 @@ export function addPoint(event) {
 
         // If two points are selected, draw the line and measure distance
         if (points.length === 2) {
-            drawLine(points);
-            // measureDistance(points);
             isMeasuring = false
+
+            drawLine(points);
+            scene.add( line );
+
+            addLabel(points);
+            scene.add(measurementLabel);
+        
+            populateMeasurementContainer(points);
+            
         }
     }
 }
@@ -155,15 +162,44 @@ function drawLine(start, end) {
 
     const geometry = new THREE.BufferGeometry().setFromPoints( points );
 
-    line = new THREE.Line( geometry, material );
-    scene.add( line );
-    addLabel(points);
-    render();
+    return line = new THREE.Line( geometry, material );
+}
+
+function populateMeasurementContainer(points) {
+    const measurement = measureDistance(points);
+    const innerHTML = `
+    <p class="mb-1">Point 1: x: ${(points[0].x).toFixed(2)}, y: ${(points[0].y).toFixed(2)}, z: ${(points[0].z).toFixed(2)}</p>
+    <p class="mb-1">Point 2: x: ${(points[1].x).toFixed(2)}, y: ${(points[1].y).toFixed(2)}, z: ${(points[1].z).toFixed(2)}</p>
+    <p class="mb-1">Distance: ${measurement} metres</p>`;
+    
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.remove('d-none');
+    
+    // Create a new div element
+    const measurementContainer = document.createElement('div');
+    measurementContainer.className = 'measurementText'
+    measurementContainer.style.backgroundColor = '#fff';
+    measurementContainer.style.padding = '5px';
+    measurementContainer.style.fontFamily = 'Arial, sans-serif';
+    measurementContainer.innerHTML = innerHTML; // Set the inner HTML
+
+    sidebar.appendChild(measurementContainer); // Append the new div to the container
+    const clearMeasurementButton = document.createElement('a');
+    clearMeasurementButton.href = '#';
+    clearMeasurementButton.id = 'clearMeasurement';
+    clearMeasurementButton.className = 'btn btn-sm btn-primary align-self-end';
+    clearMeasurementButton.innerText = 'Clear';
+    clearMeasurementButton.addEventListener('click', (event) => {
+        event.preventDefault(); // Prevent default anchor behavior
+        clearMeasurement(); // Call the clearMeasurement function
+    });
+    sidebar.appendChild(clearMeasurementButton);
 }
 
 function addLabel(points) {
     const innerText = measureDistance(points);
     console.log("innerText", innerText);
+
     const measurementDiv = document.createElement('div');
     measurementDiv.className = 'measurementLabel'
     measurementDiv.style.backgroundColor = '#fff';
@@ -177,13 +213,12 @@ function addLabel(points) {
 
     // Calculate the midpoint of the line
     const midPoint = new THREE.Vector3().addVectors(points[0], points[1]).multiplyScalar(0.5);
-    // Option 1: Position the label slightly above the line
+
     const offsetY = 1; // Adjust this value to move the label higher or lower
     measurementLabel = new CSS2DObject(measurementDiv);
     measurementLabel.position.set(midPoint.x, midPoint.y + offsetY, midPoint.z); // Adjust y position
 
-    // Add the label to the scene
-    scene.add(measurementLabel);
+    return measurementLabel;
 }
 
 // Function to measure distance between two points
@@ -192,7 +227,6 @@ function measureDistance(points) {
         console.log(`Measurement: ${measurement.toFixed(2)} meters`);
         measurement = points[0].distanceTo(points[1]);
         return measurement.toFixed(2);
-        // addLabel(measurement, points[1]);
     }
 }
 
@@ -217,7 +251,13 @@ export function clearMeasurement() {
         scene.remove(measurementLabel);
         measurementLabel = null;
     }
+
     // Clear the points array for new measurements
     points = [];
+
+    // Clear the measurementContainer
+    const sidebar = document.getElementById('sidebar');
+    sidebar.innerHTML = ''; // Clear the contents
+    sidebar.classList.add('d-none'); // Hide the sidebar
 }
 
