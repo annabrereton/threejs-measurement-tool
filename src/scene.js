@@ -1,7 +1,10 @@
 import * as THREE from 'three';
+import {
+    CSS2DRenderer,
+} from 'three/examples/jsm/renderers/CSS2DRenderer'
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 import { objectsToIntersect } from './tools.js';
-    
+
 // Global variables
 export let scene, camera, renderer, orbitControls, mapMesh;
 
@@ -68,6 +71,13 @@ export function setupOrbitControls() {
     console.log("orbitControls set up.");
 }
 
+export const labelRenderer = new CSS2DRenderer()
+labelRenderer.setSize(window.innerWidth, window.innerHeight)
+labelRenderer.domElement.style.position = 'absolute'
+labelRenderer.domElement.style.top = '0px'
+labelRenderer.domElement.style.pointerEvents = 'none'
+document.body.appendChild(labelRenderer.domElement)
+
 // Handle window resize
 export function handleResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -78,12 +88,13 @@ export function handleResize() {
 // Animation loop
 export function animate() {
     requestAnimationFrame(animate);
+
     orbitControls.update();
  
-    renderer.render(scene, camera);
-    renderer.render(scene, camera);
+    render();
 }
 
 export function render() {
+    labelRenderer.render(scene, camera)
     renderer.render( scene, camera );
 }

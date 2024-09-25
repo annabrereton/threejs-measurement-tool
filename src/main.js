@@ -10,7 +10,7 @@ import {
 } from './scene.js';
 import { createAndRenderHouse } from './house.js';
 import { loadTreeModel } from './tree.js';
-import { addPoint, clearMeasurement } from './tools.js'; // Import the measurement function
+import { setupEventListeners } from './eventListeners.js';
 
 // Initialize application
 function init() {
@@ -30,13 +30,7 @@ function init() {
     });
     loadTreeModel();
     animate();
-    window.addEventListener('resize', handleResize);
-
-    // Add mouse click event listener for measuring distance
-    window.addEventListener('click', (event) => {
-        // clearMeasurement(); // Clear previous measurements
-        addPoint(event); // Add a new point
-    });
+    setupEventListeners();
 }
 
 init();
