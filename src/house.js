@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mapHeight } from './scene.js';
+import { objectsToIntersect } from './tools.js';
 
 // Function to create and render a single house
 export function createAndRenderHouse(scene, {
@@ -42,6 +43,7 @@ export function createAndRenderHouse(scene, {
 
     // Add the house to the scene
     scene.add(house);
+    objectsToIntersect.push(house);
     console.log("house", house);
 }
 

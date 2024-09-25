@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
-
+import { objectsToIntersect } from './tools.js';
+    
 // Global variables
 export let scene, camera, renderer, orbitControls, mapMesh;
 
@@ -8,9 +9,6 @@ export let scene, camera, renderer, orbitControls, mapMesh;
 export const mapDiameter = 300;        // Diameter in meters
 export const mapHeight = 10;           // Height of the cylinder
 export const mapRadius = mapDiameter / 2;
-
-// Create raycaster
-export const raycaster = new THREE.Raycaster();
 
 // Basic scene setup
 export function setupScene() {
@@ -36,6 +34,7 @@ export function setupMapMesh() {
     mapMesh.name = 'mapMesh';
     mapMesh.userData.type = 'mapMesh';
     scene.add(mapMesh);
+    objectsToIntersect.push(mapMesh);
 
     // GRID HELPER
     let grid = new THREE.GridHelper(300, 10, "aqua", "gray");
@@ -67,19 +66,6 @@ export function addLights() {
 export function setupOrbitControls() {
     orbitControls = new OrbitControls(camera, renderer.domElement);
     console.log("orbitControls set up.");
-}
-
-// Check for intersection with objects
-export function checkIntersection(mouse) {
-    raycaster.setFromCamera(mouse, camera);
-    const objectsToIntersect = [mapMesh, ...allHouses, ...allTrees]; // Ensure mapMesh is included
-    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
-
-    if (intersects.length > 0) {
-        const intersection = intersects[0];
-        return intersection; // Return the full intersection object
-    }
-    return null;
 }
 
 // Handle window resize

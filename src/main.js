@@ -9,7 +9,8 @@ import {
     handleResize
 } from './scene.js';
 import { createAndRenderHouse } from './house.js';
-import { loadTreeModel } from './tree.js'
+import { loadTreeModel } from './tree.js';
+import { addPoint, clearMeasurement } from './tools.js'; // Import the measurement function
 
 // Initialize application
 function init() {
@@ -27,9 +28,15 @@ function init() {
         windowStyle: 'rectangular',
         scale: 11
     });
-    loadTreeModel()
+    loadTreeModel();
     animate();
     window.addEventListener('resize', handleResize);
+
+    // Add mouse click event listener for measuring distance
+    window.addEventListener('click', (event) => {
+        // clearMeasurement(); // Clear previous measurements
+        addPoint(event); // Add a new point
+    });
 }
 
 init();

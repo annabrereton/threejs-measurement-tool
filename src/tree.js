@@ -2,6 +2,7 @@
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'; 
 import {mapHeight, scene} from './scene.js';
+import { objectsToIntersect } from './tools.js';
 
 export function loadTreeModel() {
     const treeLoader = new GLTFLoader();
@@ -22,6 +23,7 @@ export function loadTreeModel() {
         });
     
         scene.add(tree);
+        objectsToIntersect.push(tree);
         console.log("tree", tree);
     }, undefined, function (error) {
         console.error('An error occurred while loading the GLTF model:', error);
