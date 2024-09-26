@@ -1,4 +1,4 @@
-import { mapDiameter, mapRadius, camera, scene, render, orbitControls, renderer, labelRenderer } from './scene.js';
+import { camera, scene,  orbitControls, renderer } from './scene.js';
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer'
 
@@ -20,59 +20,16 @@ let hasAreaMeasurement = false;
 export const raycaster = new THREE.Raycaster();
 export const mouse = new THREE.Vector2(); // Mouse position
 
-const latBottomLeft = 0;
-const lonBottomLeft = 0;
-const latTopRight = 1;
-const lonTopRight = 1;
-
-// Function to convert integer scale to decimal scale
-export function convertIntegerToScale(integer) {
-    const mapping = {
-        1: 0.2,
-        2: 0.4,
-        3: 0.5,
-        4: 0.6,
-        5: 0.7,
-        6: 0.8,
-        7: 0.9,
-        8: 1.0
-    };
-
-    return mapping[integer] || 0.9; // Default scale if not found
-}
-
-// Convert latitude and longitude to map coordinates
-export function latLonToMapCoords(lat, lon) {
-    const normalizedLat = (lat - latBottomLeft) / (latTopRight - latBottomLeft);
-    const normalizedLon = (lon - lonBottomLeft) / (lonTopRight - lonBottomLeft);
-    const x = normalizedLon * mapDiameter - mapRadius;
-    const y = normalizedLat * mapDiameter - mapRadius;
-    return { x, y };
-}
-
-// Convert map coordinates to latitude and longitude
-export function mapCoordsToLatLon(x, y) {
-    const normalizedLon = (x + mapRadius) / mapDiameter;
-    const normalizedLat = (y + mapRadius) / mapDiameter;
-
-    const lon = normalizedLon * (lonTopRight - lonBottomLeft) + lonBottomLeft;
-    const lat = normalizedLat * (latTopRight - latBottomLeft) + latBottomLeft;
-
-    return { lat, lon };
-}
 
 // Function to handle key down events
-export function onKeyDown (event) {
-    // Prevent new measurement if an active one exists
-    if (hasActiveMeasurement) return;
-    
+export function onKeyDown(event) {
+    if (hasActiveMeasurement) return; // Prevent new measurement if an active one exists
+
     if (event.key === 'm') {
-        // console.log("m key pressed");
-        enableMeasurement = true
-        orbitControls.enabled = false
-        renderer.domElement.style.cursor = 'crosshair'
+        enableMeasurement = true;
+        orbitControls.enabled = false;
+        renderer.domElement.style.cursor = 'crosshair';
     } else if (event.key === 'a') {
-        // console.log("a key pressed");
         enableAreaMeasurement = true; // Enable point selection
         orbitControls.enabled = false;
         renderer.domElement.style.cursor = 'crosshair';
@@ -80,27 +37,25 @@ export function onKeyDown (event) {
 }
 
 // Function to handle key up events
-export function onKeyUp (event) {
+export function onKeyUp(event) {
     if (event.key === 'm') {
-        enableMeasurement = false
-        orbitControls.enabled = true
-        renderer.domElement.style.cursor = 'pointer'
+        enableMeasurement = false;
+        orbitControls.enabled = true;
+        renderer.domElement.style.cursor = 'pointer';
         if (isMeasuring) {
-            scene.remove(line) // remove the last line because it wasn't committed
-            isMeasuring = false
+            scene.remove(line); // Remove the last line because it wasn't committed
+            isMeasuring = false;
         }
     } else if (event.key === 'a') {
         enableAreaMeasurement = false;
         orbitControls.enabled = true;
         renderer.domElement.style.cursor = 'pointer';
-        if (areaPoints.length < 3) {
-            clearMeasurement();
-        }
-        // If three or more points are selected, calculate area
-        if (areaPoints.length >= 3 && !hasAreaMeasurement) {
+        if (areaPoints.length < 3) { 
+            clearMeasurement();  // Clear if measurement not completed
+        } else if (areaPoints.length >= 3 && !hasAreaMeasurement) {
             const area = calculateArea(areaPoints);
             console.log(`Area: ${area.toFixed(2)} square metres`);
-            drawPolygon(areaPoints);  // Draw the polygon based on selected area points
+            drawPolygon(areaPoints); // Draw the polygon based on selected area points
             populateAreaMeasurementContainer(area); // Display area details in the sidebar
         }
     }
@@ -120,15 +75,9 @@ export function onMouseClick(event) {
 
 // Function to check intersection with objects
 export function checkIntersection(event) {
-    // Update mouse position
-    onMouseMove(event);
-
-    // Set the raycaster from the camera
-    raycaster.setFromCamera(mouse, camera);
-
-    // Check for intersections
+    onMouseMove(event); // Update mouse position
+    raycaster.setFromCamera(mouse, camera); // Set the raycaster from the camera
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
-
     return intersects.length > 0 ? intersects[0] : null; // Return the first intersection or null
 }
 
@@ -309,21 +258,14 @@ function measureDistance(points) {
 
 // // Function to clear all measurements
 function clearMeasurement() {
-    // Clear points and area points
     console.log("Clearing measurement", points, areaPoints, line, polygon, measurementLabel, dots, measurement);
     points = [];
     areaPoints = [];
-
-    // Remove line and polygon from the scene if they exist
     if (line) scene.remove(line);
     if (polygon) scene.remove(polygon);
     if (measurementLabel) scene.remove(measurementLabel);
-
-    // Remove all dots from the scene
     dots.forEach(dot => scene.remove(dot));
     dots = [];
-
-    // Reset measurement states
     measurement = 0;
     hasActiveMeasurement = false;
     hasAreaMeasurement = false;
@@ -331,7 +273,7 @@ function clearMeasurement() {
     enableMeasurement = false;
     enableAreaMeasurement = false;
 
-    // Optionally clear sidebar
+    // Clear sidebar
     const sidebar = document.getElementById('sidebar');
     sidebar.innerHTML = ''; // Clear all measurement details
     sidebar.classList.add('d-none');
