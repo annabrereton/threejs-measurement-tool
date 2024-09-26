@@ -3,7 +3,9 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer'
 
 let points = []; // Store selected points for measurement
+let areaPoints = []; // Store selected points for area measurement
 let line; // Line object to visualize the distance
+let polygon; // Polygon object to visualize the area
 let dot; // Dot object to visualize the distance
 const dotSize = 0.5; // Size of the dots
 let dots = [];
@@ -11,8 +13,10 @@ export let objectsToIntersect = []
 let measurement = 0;
 let measurementLabel;
 let enableMeasurement = false;
+let enableAreaMeasurement = false;
 let isMeasuring = false;
-
+let hasActiveMeasurement = false;
+let hasAreaMeasurement = false;
 export const raycaster = new THREE.Raycaster();
 export const mouse = new THREE.Vector2(); // Mouse position
 
@@ -59,29 +63,45 @@ export function mapCoordsToLatLon(x, y) {
 
 // Function to handle key down events
 export function onKeyDown (event) {
-    console.log("onKeyDown", event);
+    // Prevent new measurement if an active one exists
+    if (hasActiveMeasurement) return;
+    
     if (event.key === 'm') {
-        console.log("m key pressed");
-
-
+        // console.log("m key pressed");
         enableMeasurement = true
         orbitControls.enabled = false
         renderer.domElement.style.cursor = 'crosshair'
+    } else if (event.key === 'a') {
+        // console.log("a key pressed");
+        enableAreaMeasurement = true; // Enable point selection
+        orbitControls.enabled = false;
+        renderer.domElement.style.cursor = 'crosshair';
     }
 }
 
 // Function to handle key up events
 export function onKeyUp (event) {
-    console.log("onKeyUp", event);
     if (event.key === 'm') {
         enableMeasurement = false
         orbitControls.enabled = true
         renderer.domElement.style.cursor = 'pointer'
         if (isMeasuring) {
-            //delete the last line because it wasn't committed
-            scene.remove(line)
-            // scene.remove(measurementLabels[lineId])
+            scene.remove(line) // remove the last line because it wasn't committed
             isMeasuring = false
+        }
+    } else if (event.key === 'a') {
+        enableAreaMeasurement = false;
+        orbitControls.enabled = true;
+        renderer.domElement.style.cursor = 'pointer';
+        if (areaPoints.length < 3) {
+            clearMeasurement();
+        }
+        // If three or more points are selected, calculate area
+        if (areaPoints.length >= 3 && !hasAreaMeasurement) {
+            const area = calculateArea(areaPoints);
+            console.log(`Area: ${area.toFixed(2)} square metres`);
+            drawPolygon(areaPoints);  // Draw the polygon based on selected area points
+            populateAreaMeasurementContainer(area); // Display area details in the sidebar
         }
     }
 }
@@ -93,7 +113,7 @@ export function onMouseMove(event) {
 }
 
 export function onMouseClick(event) {
-    if (enableMeasurement) {
+    if (enableMeasurement || enableAreaMeasurement) {
         addPoint(event);
     }
 }
@@ -114,32 +134,32 @@ export function checkIntersection(event) {
 
 // Function to add a point to points array and mark with a dot
 export function addPoint(event) { 
-    // Clear existing measurement if there are already two points
-    if (points.length === 2) {
-        console.log("clearing:", line, dots)
-        clearMeasurement(); // Clear the previous line and dots
-    }
-
     // Check for intersection with objects
     let intersects = checkIntersection(event);
     if (intersects) {
-        let point = intersects.point;
-        points.push(point); // Add the new point
-        addDot(point); // Mark the point with a dot
-        isMeasuring = true
+        const point = intersects.point; // Get the intersection point
 
-        // If two points are selected, draw the line and measure distance
-        if (points.length === 2) {
-            isMeasuring = false
+        // If measurement mode is enabled
+        if (enableMeasurement) {      
+            points.push(point); // Add the point to the measurement array
+            addDot(point); // Mark the point with a dot
+            isMeasuring = true;
 
-            drawLine(points);
-            scene.add( line );
+            // If two points are selected, draw the line and measure distance
+            if (points.length === 2) {
+                isMeasuring = false;
+                drawLine(points);
+                addLabel(points);
+                populateMeasurementContainer(points);
+                hasActiveMeasurement = true;
+            }
+        } else if (enableAreaMeasurement) { // If 'a' key is pressed, handle area calculation        
+            areaPoints.push(point); // Add to area points
+            addDot(point); // Mark the point with a dot
 
-            addLabel(points);
-            scene.add(measurementLabel);
-        
-            populateMeasurementContainer(points);
-            
+            if (areaPoints.length >= 3) {
+                hasActiveMeasurement = true; // Prevent further measurements until cleared
+            }
         }
     }
 }
@@ -162,7 +182,65 @@ function drawLine(start, end) {
 
     const geometry = new THREE.BufferGeometry().setFromPoints( points );
 
-    return line = new THREE.Line( geometry, material );
+    line = new THREE.Line( geometry, material );
+    scene.add(line);
+}
+
+// Function to draw a polygon around the selected points
+function drawPolygon(areaPoints) {
+    // Convert Vector3 points to Vector2 to create a polygon
+    const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    const geometry = new THREE.BufferGeometry().setFromPoints(areaPoints);
+    polygon = new THREE.LineLoop(geometry, material);
+    scene.add(polygon);
+}
+
+function calculateArea(points) {
+    let area = 0;
+    const n = points.length;
+
+    // Calculate the area using the 2D projection (ignoring y-axis, using x and z)
+    for (let i = 0; i < n; i++) {
+        const currentPoint = points[i];
+        const nextPoint = points[(i + 1) % n]; // Wrap around to the first point
+        
+        // Use only the x and y coordinates for area calculation
+        area += currentPoint.x * nextPoint.z;
+        area -= nextPoint.x * currentPoint.z;
+    }
+
+    area = Math.abs(area) / 2; // Absolute value and divide by 2 to get the final area
+    console.log("area", area);
+    return area;
+}
+
+// Function to display area details in the sidebar
+function populateAreaMeasurementContainer(area) {
+    const innerHTML = `<p class="mb-1">Area: ${area.toFixed(2)} square metres</p>`;
+
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.remove('d-none');
+
+    const measurementContainer = document.createElement('div');
+    measurementContainer.className = 'measurementText';
+    measurementContainer.style.backgroundColor = '#fff';
+    measurementContainer.style.padding = '5px';
+    measurementContainer.style.fontFamily = 'Arial, sans-serif';
+    measurementContainer.innerHTML = innerHTML;
+
+    sidebar.appendChild(measurementContainer);
+
+    const clearMeasurementButton = document.createElement('a');
+    clearMeasurementButton.href = '#';
+    clearMeasurementButton.id = 'clearMeasurement';
+    clearMeasurementButton.className = 'btn btn-sm btn-primary align-self-end';
+    clearMeasurementButton.innerText = 'Clear';
+    clearMeasurementButton.addEventListener('click', (event) => {
+        event.preventDefault(); 
+        clearMeasurement(); // Call the clear function to reset everything
+    });
+    sidebar.appendChild(clearMeasurementButton);
+    hasAreaMeasurement = true;
 }
 
 function populateMeasurementContainer(points) {
@@ -217,8 +295,7 @@ function addLabel(points) {
     const offsetY = 1; // Adjust this value to move the label higher or lower
     measurementLabel = new CSS2DObject(measurementDiv);
     measurementLabel.position.set(midPoint.x, midPoint.y + offsetY, midPoint.z); // Adjust y position
-
-    return measurementLabel;
+    scene.add(measurementLabel);
 }
 
 // Function to measure distance between two points
@@ -230,34 +307,32 @@ function measureDistance(points) {
     }
 }
 
-// Function to clear points, distance, line, and dots
-export function clearMeasurement() {
-    // Clear all dots from the scene
-    if (dots.length > 0) {
-        dots.forEach(dot => {
-            scene.remove(dot); // Remove each dot from the scene
-        });
-        dots = []; // Reset the dots array
-    }
-    console.log("Line", line);
-    // Clear the line from the scene if it exists
-    if (line) {
-        scene.remove(line); // Remove the line from the scene
-        line = null; // Reset the line variable
-    }
-    // Clear the measurement & label from the scene if it exists
-    measurement = 0;
-    if (measurementLabel) {
-        scene.remove(measurementLabel);
-        measurementLabel = null;
-    }
-
-    // Clear the points array for new measurements
+// // Function to clear all measurements
+function clearMeasurement() {
+    // Clear points and area points
+    console.log("Clearing measurement", points, areaPoints, line, polygon, measurementLabel, dots, measurement);
     points = [];
+    areaPoints = [];
 
-    // Clear the measurementContainer
+    // Remove line and polygon from the scene if they exist
+    if (line) scene.remove(line);
+    if (polygon) scene.remove(polygon);
+    if (measurementLabel) scene.remove(measurementLabel);
+
+    // Remove all dots from the scene
+    dots.forEach(dot => scene.remove(dot));
+    dots = [];
+
+    // Reset measurement states
+    measurement = 0;
+    hasActiveMeasurement = false;
+    hasAreaMeasurement = false;
+    isMeasuring = false;
+    enableMeasurement = false;
+    enableAreaMeasurement = false;
+
+    // Optionally clear sidebar
     const sidebar = document.getElementById('sidebar');
-    sidebar.innerHTML = ''; // Clear the contents
-    sidebar.classList.add('d-none'); // Hide the sidebar
+    sidebar.innerHTML = ''; // Clear all measurement details
+    sidebar.classList.add('d-none');
 }
-
