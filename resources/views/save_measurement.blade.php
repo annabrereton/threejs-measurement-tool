@@ -10,6 +10,40 @@
                 <form id="saveMeasurementForm" method="POST" action="{{ route('measurements.store') }}">
                     @csrf
 
+                    <!-- Dynamic Points Container -->
+                    <div id="pointsContainer">
+                        <!-- Points will be dynamically added here -->
+                    </div>
+
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Distance</span>
+                        <input type="number" class="form-control" id="total_distance" name="total_distance" readonly>
+                    </div>
+
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Reference/Name</span>
+                        <input type="text" class="form-control" id="measurementName" name="name" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Measurement</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Measurement Modal
+<div class="modal fade" id="saveMeasurementModal" tabindex="-1" aria-labelledby="saveMeasurementModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveMeasurementModalLabel">Save Measurement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="saveMeasurementForm" method="POST" action="{{ route('measurements.store') }}">
+                    @csrf
+
                     <div class="input-group mb-3">
                         <span class="input-group-text">Point 1</span>
                         <input type="number" class="form-control" id="point1_x" name="point1_x" readonly>
@@ -38,4 +72,4 @@
             </div>
         </div>
     </div>
-</div>
+</div> -->

@@ -34,6 +34,13 @@ async function init() {
     animate();
     setupEventListeners();
     fetchAndDisplaySavedMeasurements()
+
+        // Add the WebGL context lost event listener
+        canvas.addEventListener('webglcontextlost', function(event) {
+            event.preventDefault();
+            console.log('WebGL context lost');
+            // Handle context loss (e.g., reset the scene)
+        }, false);
 }
 
 init();

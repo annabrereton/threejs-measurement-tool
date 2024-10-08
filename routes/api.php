@@ -8,6 +8,6 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-// Route::post('/measurements', [MeasurementController::class, 'store'])->name('measurements.store');
+Route::post('/measurements', [MeasurementController::class, 'store'])->name('measurements.store');
 Route::delete('/measurements/{id}', [MeasurementController::class, 'destroy'])->name('measurements.destroy');
 

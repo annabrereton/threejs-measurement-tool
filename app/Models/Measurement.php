@@ -11,13 +11,13 @@ class Measurement extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'point1_x',
-        'point1_y',
-        'point1_z',
-        'point2_x',
-        'point2_y',
-        'point2_z',
-        'distance',
-        'name'
+        'name',
+        'total_distance',
     ];
+
+    // Define the relationship with the Point model
+    public function points()
+    {
+        return $this->hasMany(Point::class);
+    }
 }

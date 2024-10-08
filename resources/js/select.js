@@ -1,4 +1,5 @@
-import { checkIntersection } from './scene.js';
+import { scene, checkIntersection } from './scene.js';
+import { addLabel, measurementLabels } from './measurements.js';
 
 export let selectedObject = null;
 export let enableSelect = false;
@@ -52,15 +53,22 @@ export function selectObject(event) {
 
         console.log("Object selected:", targetObject.name);
 
-        // Check if the intersected object is a dot or line
-        if (objectType === 'dot' || objectType === 'measurementLine') {
-            console.log("Part of measurement selected:", targetObject.name);
-            // Highlight the group if the target object is part of a group
-            const measurementGroup = targetObject.parent; // Assuming the parent is the group
+        // Check if the clicked object is part of a measurement group
+        if (objectType === 'measurementLine' || objectType === 'dot') {
+            const measurementGroup = targetObject.parent; // Get the parent group
             if (measurementGroup && measurementGroup.isGroup) {
+                // Highlight the group
                 highlightObject(measurementGroup); // Highlight the entire group
-            } else {
-                highlightObject(targetObject); // Highlight the individual object
+
+                // Gather points from the measurement group's children
+                const points = measurementGroup.children
+                    .filter(child => child.userData.type === 'dot') // Find all dots
+                    .map(dot => dot.position.clone()); // Get their positions
+
+                // Call addLabel to display distances
+                if (points.length > 1) {
+                    addLabel(points); // Only add labels if there are enough points
+                }
             }
             selectedObject = targetObject; // Set the selected object
             return; // Exit early
@@ -142,7 +150,6 @@ export function unhighlightObject(object) {
     }
 }
 
-
 // Remove highlight from the object (panel)
 export function deselectObject(object) {
     // Check if the object is part of a group
@@ -151,7 +158,11 @@ export function deselectObject(object) {
 
         // Unhighlight the entire group
         unhighlightObject(measurementGroup);
-
+        
+         // Remove all measurement labels
+         measurementLabels.forEach(label => scene.remove(label));
+         measurementLabels.length = 0; // Clear the labels array
+ 
         // Optionally, you can also loop through the children to ensure they are unhighlighted
         measurementGroup.children.forEach(child => {
             unhighlightObject(child);
