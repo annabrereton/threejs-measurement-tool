@@ -13,6 +13,7 @@ class Measurement extends Model
     protected $fillable = [
         'name',
         'total_distance',
+        'colour',
     ];
 
     // Define the relationship with the Point model

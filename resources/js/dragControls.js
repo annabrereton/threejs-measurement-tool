@@ -1,7 +1,7 @@
-import * as THREE from 'three';
 import { DragControls } from 'three/addons/controls/DragControls.js';
-import { camera, renderer, orbitControls, render, labelRenderer, checkIntersection } from './scene.js';
+import { camera, renderer, orbitControls, render, labelRenderer } from './scene.js';
 import { selectedObject } from './select.js';
+
 
 export let dragControls;
 
@@ -24,6 +24,33 @@ export function manageDKeyUp() {
     }
 }
 
+export function manageRKeyDown() {
+    // console.log('R key down');
+    if (dragControls) {
+        return;
+    }
+    if (selectedObject) {
+        // console.log("Enabling dragging", selectedObject);
+        setupDragControls(selectedObject, true);
+    }
+}
+
+export function manageRKeyUp() {
+    // console.log('R key up');
+    if (dragControls) {
+        // console.log("Disposing drag controls");
+        disposeDragControls();
+    }
+}
+
+export function disposeDragControls() {
+    if (dragControls) {
+        dragControls.dispose();
+        dragControls = null;
+        console.log('Drag controls disposed');
+    }
+}
+
 export function setupDragControls(objectsToDrag, isRotating = false) {
     console.log('Setting up drag controls', objectsToDrag, isRotating);
     if (dragControls) {
@@ -38,27 +65,27 @@ export function setupDragControls(objectsToDrag, isRotating = false) {
     });
 
     dragControls.addEventListener('drag', function (event) {
-          // Perform raycasting during dragging
-          const intersect = checkIntersection(event);
+        //   // Perform raycasting during dragging - trying to snap moving object to surfaces
+        //   const intersect = checkIntersection(event);
+        //   if (intersect) {
+        //       // Snap object to the intersection point
+        //       event.object.position.copy(intersect.point);
+  
+        //       // Align the object's rotation to the surface normal
+        //       const normal = intersect.face.normal.clone();
+        //       const up = new THREE.Vector3(0, 1, 0); // Default up-vector
+        //       const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
+        //       event.object.quaternion.copy(quaternion); // Align rotation
+        //   }
 
-          if (intersect) {
-              // Snap object to the intersection point
-              event.object.position.copy(intersect.point);
-  
-              // Align the object's rotation to the surface normal
-              const normal = intersect.face.normal.clone();
-              const up = new THREE.Vector3(0, 1, 0); // Default up-vector
-              const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
-              event.object.quaternion.copy(quaternion); // Align rotation
-          }
-          
-          // If rotating is enabled, apply rotation logic
-          if (isRotating) {
-              event.object.rotation.y += 0.1;
-              console.log("Rotating object", event.object.rotation.y);
-          }
-  
-          render(); // Re-render the scene to reflect changes
+
+        // If rotating is enabled, apply rotation logic
+        if (isRotating) {
+            event.object.rotation.y += 0.1;
+            console.log("Rotating object", event.object.rotation.y);
+        }
+
+        render(); // Re-render the scene to reflect changes
     });
 
     dragControls.addEventListener('dragend', function (event) {
@@ -66,30 +93,23 @@ export function setupDragControls(objectsToDrag, isRotating = false) {
         orbitControls.enabled = true;
         console.log('Drag ended on:', event.object.name);
 
-        // Perform a final snap to the nearest surface
-        const intersect = checkIntersection(event);
+        // // Perform a final snap to the nearest surface - for solar panels
+        // const intersect = checkIntersection(event);
 
-        if (intersect) {
-            // Snap object to the intersection point
-            event.object.position.copy(intersect.point);
+        // if (intersect) {
+        //     // Snap object to the intersection point
+        //     event.object.position.copy(intersect.point);
 
-            // Align the object's rotation to the surface normal
-            const normal = intersect.face.normal.clone();
-            const up = new THREE.Vector3(0, 1, 0); // Default up-vector
-            const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
-            event.object.quaternion.copy(quaternion); // Align rotation
-        }
+        //     // Align the object's rotation to the surface normal
+        //     const normal = intersect.face.normal.clone();
+        //     const up = new THREE.Vector3(0, 1, 0); // Default up-vector
+        //     const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
+        //     event.object.quaternion.copy(quaternion); // Align rotation
+        // }
+
 
         render(); // Re-render the scene
     });
     
     dragControls.enabled = true;
-}
-
-export function disposeDragControls() {
-    if (dragControls) {
-        dragControls.dispose();
-        dragControls = null;
-        console.log('Drag controls disposed');
-    }
 }

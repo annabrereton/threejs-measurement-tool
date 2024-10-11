@@ -76,10 +76,23 @@ export function setupOrbitControls() {
 
 // Function to check intersection with objects
 export function checkIntersection(event) {
+    console.log("Objects to intersect:", objectsToIntersect);
     onMouseMove(event); // Update mouse position
     raycaster.setFromCamera(mouse, camera); // Set the raycaster from the camera
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
-    return intersects.length > 0 ? intersects[0] : null; // Return the first intersection or null
+    console.log("intersects", intersects);
+    // return intersects.length > 0 ? intersects[0] : null; // Return the first intersection or null
+    if (intersects.length > 0) {
+        const intersect = intersects[0];
+        console.log("Intersection found at point:", intersect.point);
+        console.log("Intersection normal:", intersect.face?.normal);
+
+        // Return the first intersection found
+        return intersect;
+    } else {
+        console.log("No intersection found.");
+        return null; // No intersection
+    }
 }
 
 

@@ -25,12 +25,14 @@ class MeasurementController extends Controller
             'points.*.x' => 'required|numeric',
             'points.*.y' => 'required|numeric',
             'points.*.z' => 'required|numeric',
+            'colour' => 'required|string|max:7',
         ]);
     
         // Create the measurement
         $measurement = Measurement::create([
             'name' => $request->input('name'),
             'total_distance' => $request->input('total_distance'),
+            'colour' => $request->input('colour'),
         ]);
     
         // Save the points
@@ -43,7 +45,27 @@ class MeasurementController extends Controller
             }
         }
     
-        return response()->json($measurement->load('points'), 201); // Return the measurement with points
+        return response()->json([
+            'success' => true,
+            'message' => 'Measurement saved successfully',
+            'measurement' => $measurement
+        ]);
+        // return response()->json($measurement->load('points'), 201); // Return the measurement with points
+    }
+
+    public function update(Request $request, Measurement $measurement)
+    {
+        $validatedData = $request->validate([
+            'edit_name' => 'required|string|max:255',
+            'edit_colour' => 'required|string|max:7',
+        ]);
+
+        $measurement->update([
+            'name' => $validatedData['edit_name'],
+            'colour' => $validatedData['edit_colour'],
+        ]);
+        
+        return redirect()->back()->with('success', 'Measurement updated successfully');
     }
 
     // Method to delete a measurement
@@ -61,6 +83,10 @@ class MeasurementController extends Controller
         $measurement->delete();
 
         // Return a success response
+        // return response()->json([
+        //     'success' => true,
+        //     'message' => 'Measurement deleted successfully'
+        // ]);
         return response()->json(['message' => 'Measurement deleted successfully'], 200);
     }
 }

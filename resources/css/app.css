@@ -10,6 +10,22 @@ canvas {
     z-index: 1;
 }
 
+#alerts-wrapper {
+    position: absolute; /* Use fixed to keep alerts in view as the page scrolls */
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000; /* Ensure it's above other content but below modals */
+    pointer-events: none; /* Allow clicks to pass through */
+}
+
+.alert {
+    width: 100%;
+    z-index: 1000;
+    margin-bottom: 10px; /* Spacing between alerts */
+    pointer-events: auto;
+}
+
 #newMeasurementSidebar {
     position: fixed;
     bottom: 10px;
@@ -20,7 +36,7 @@ canvas {
     border-radius: 5px;
     padding: 10px;
     font-family: Arial, sans-serif;
-    z-index: 1000;
+    z-index: 999;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -36,7 +52,7 @@ canvas {
     border-radius: 5px;
     padding: 10px;
     font-family: Arial, sans-serif;
-    z-index: 1000;
+    z-index: 999;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -75,4 +91,13 @@ h1 {
     top: 10px;
     left: 10px;
     color: #ffffff;
+}
+
+.input-group .form-control[type="color"] {
+    height: calc(2.25rem + 2px); /* Same height as Bootstrap form controls */
+    padding: 0.375rem 0.75rem;   /* Same padding as other input types */
+    max-width: none;             /* Remove any automatic width constraints */
+    display: flex;
+    align-items: center;
+    z-index: 1001;
 }

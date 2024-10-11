@@ -5,7 +5,7 @@ import {
     manageMKeyUp,
  } from './measurements.js';
 import { manageSKeyDown, manageSKeyUp } from './select.js';
-import { manageDKeyDown, manageDKeyUp } from './dragControls.js';
+import { manageDKeyDown, manageDKeyUp, manageRKeyDown, manageRKeyUp } from './dragControls.js';
 
 // Function to handle key down events
 export function onKeyDown(event) {
@@ -17,6 +17,8 @@ export function onKeyDown(event) {
         manageSKeyDown(); // Call the function to handle 's' key down
     } else if (event.key === 'd') {
         manageDKeyDown(); // Call the function to handle 'd' key down
+    } else if (event.key === 'r') {
+        manageRKeyDown(); // Call the function to handle 'r' key down
     }
 }
 
@@ -30,5 +32,7 @@ export function onKeyUp(event) {
         manageSKeyUp(); // Call the function to handle 's' key up
     } else if (event.key === 'd') {
         manageDKeyUp(); // Call the function to handle 'd' key up
+    } else if (event.key === 'r') {
+        manageRKeyUp(); // Call the function to handle 'r' key up
     }
 }

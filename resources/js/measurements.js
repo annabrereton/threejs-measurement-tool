@@ -1,51 +1,50 @@
 import { scene,  orbitControls, renderer, checkIntersection, objectsToIntersect } from './scene.js';
-import axios from 'axios';
 import * as THREE from 'three';
-import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer'
+import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer';
+import { openSaveModal, removeBackdrop } from './modals.js';
+import { selectedObject } from './select.js';
+import { openEditMeasurementModal } from './modals.js';
+import { updateMeasurementRequest, deleteMeasurementRequest } from './axios.js';
+import { showMessage } from './alerts.js';
 
-let points = []; // Store selected points for measurement
 let areaPoints = []; // Store selected points for area measurement
-let line; // Line object to visualize the distance
 let polygon; // Polygon object to visualize the area
-let dot; // Dot object to visualize the distance
 const dotSize = 0.5; // Size of the dots
-let dots = [];
-// let measurement = 0;
+let areaDots = [];
 let measurementLabel;
 let enableMeasurement = false;
 let enableAreaMeasurement = false;
-let hasActiveMeasurement = false;
-let currentMeasurement = { points: [], distances: [], totalDistance: 0, dots: [] }; // Object to store the current measurement datalet hasActiveMeasurement = false;
+export let hasActiveMeasurement = false;
+export let currentMeasurement = { 
+    points: [], 
+    distances: [], 
+    totalDistance: 0, 
+    dots: [], 
+    lines: [],
+    lastPoint: null,
+    lastDot: null,
+    lastLine: null,
+    lastDistance: 0
+}; // Object to store the current measurement data
 let hasAreaMeasurement = false;
 let measurementIndex = 0; // Initialize a counter outside the function
-// let distances = []; // Array to hold distances between points
-export let measurementLabels = []; // Array to store measurement labels
 let measurementContainer;
 
 
 export function manageMKeyDown() {
+    if (selectedObject) {
+        enableMeasurement = false; 
+        return;
+    }
     enableMeasurement = true;
     orbitControls.enabled = false;
     renderer.domElement.style.cursor = 'crosshair';
-
-    // console.log("Current Measurement", currentMeasurement);
 }
 
 export function manageMKeyUp() {
     enableMeasurement = false;
     orbitControls.enabled = true;
     renderer.domElement.style.cursor = 'pointer';
-
-    // If there are points, finalize the measurement
-    if (currentMeasurement.points.length > 0) {
-        // console.log("Current Measurement", currentMeasurement);
-        hasActiveMeasurement = true;
-        // populateMeasurementContainer(currentMeasurement); 
-        if (currentMeasurement.points.length > 1) {
-            // Draw the line and update the measurement container
-            drawLine(currentMeasurement.points); // Draw the line connecting all points
-        }
-    }
 }
 
 // Function to handle 'a' key down
@@ -88,19 +87,27 @@ export function addPoint(event) {
 
         // If measurement mode is enabled
         if (enableMeasurement) {      
+            currentMeasurement.lastPoint = point;
             currentMeasurement.points.push(point); // Add the point to the measurement array
             const dot = addDot(point); // Mark the point with a dot
+            currentMeasurement.lastDot = dot;
             currentMeasurement.dots.push(dot); // Add the dot to the current measurement's dots array
             
+            if (currentMeasurement.points.length === 1) {
+                populateMeasurementContainer(currentMeasurement);
+            }
             // Calculate distance from the previous point if it exists
             if (currentMeasurement.points.length > 1) {
                 const previousPoint = currentMeasurement.points[currentMeasurement.points.length - 2]; // Get the last point added
                 const distance = calculateDistance(previousPoint, point); // Calculate distance to the new point
+                currentMeasurement.lastDistance = distance;
                 currentMeasurement.distances.push(distance); // Add the distance to the distances array
                 currentMeasurement.totalDistance += distance; // Update total distance
 
-                addLabel(currentMeasurement.points);
+                currentMeasurement.lastLine = drawLine(currentMeasurement.points);
+                addLabel();
                 populateMeasurementContainer(currentMeasurement);
+                hasActiveMeasurement = true;
 
                 // Display the distance between the two points
                 console.log(`Distance from point ${currentMeasurement.points.length - 2} to point ${currentMeasurement.points.length - 1}: ${distance.toFixed(2)} units`);
@@ -108,7 +115,8 @@ export function addPoint(event) {
 
         } else if (enableAreaMeasurement) { // If 'a' key is pressed, handle area calculation        
             areaPoints.push(point); // Add to area points
-            addDot(point); // Mark the point with a dot
+            const areaDot = addDot(point); // Mark the point with a dot
+            areaDots.push(areaDot);
 
             if (areaPoints.length >= 3) {
                 hasActiveMeasurement = true; // Prevent further measurements until cleared
@@ -128,23 +136,81 @@ function addDot(position, color = 0xff0000, trackDot = true) {
     dot.name = "dot";
     scene.add(dot);
 
-    // // Only push to dots array if trackDot is true
-    // if (trackDot) {
-    //     dots.push(dot);
-    // }
-
     return dot; // Return the created dot
 }
 
 // Function to draw a line between two points
 function drawLine(points) {
-    if (points.length < 2) return; // Need at least two points to draw a line
+    if (points.length < 2) return;
 
-    const material = new THREE.LineBasicMaterial( { color: 0xff0000 } );
-    const geometry = new THREE.BufferGeometry().setFromPoints( points );
+    const start = points[points.length - 2];
+    const end = points[points.length - 1];
 
-    line = new THREE.Line( geometry, material );
+    const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+    const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+
+    const line = new THREE.Line(geometry, material);
+    line.userData.type = "measurementLine";
+    line.userData.start = start;
+    line.userData.end = end;
     scene.add(line);
+    currentMeasurement.lines.push(line);
+    return line; // Return the created line
+}
+
+// Helper function to remove all labels from a line
+function removeLabelsFromLine(line) {
+    const labelsToRemove = [];
+    line.traverse(child => {
+        if (child.isCSS2DObject) {
+            labelsToRemove.push(child);
+        }
+    });
+    labelsToRemove.forEach(label => {
+        label.removeFromParent();
+        scene.remove(label);
+    });
+}
+
+// Undo the last point
+export function undoLastPoint() {
+    if (currentMeasurement.points.length > 0) {
+        // Remove last point
+        currentMeasurement.points.pop();
+        
+        // Remove last dot
+        if (currentMeasurement.lastDot) {
+            scene.remove(currentMeasurement.lastDot);
+            currentMeasurement.dots.pop();
+        }
+        
+         // Remove last line and its CSS2D label
+         if (currentMeasurement.lastLine) {
+            removeLabelsFromLine(currentMeasurement.lastLine);
+            scene.remove(currentMeasurement.lastLine);
+            currentMeasurement.lines.pop();
+        }
+        
+        // Update total distance
+        if (currentMeasurement.lastDistance) {
+            currentMeasurement.totalDistance -= currentMeasurement.lastDistance;
+            currentMeasurement.distances.pop();
+        }
+        
+        // Update measurement container
+        populateMeasurementContainer(currentMeasurement);
+        
+        // Reset last elements
+        currentMeasurement.lastPoint = currentMeasurement.points[currentMeasurement.points.length - 1] || null;
+        currentMeasurement.lastDot = currentMeasurement.dots[currentMeasurement.dots.length - 1] || null;
+        currentMeasurement.lastDistance = currentMeasurement.distances[currentMeasurement.distances.length - 1] || 0;
+        currentMeasurement.lastLine = currentMeasurement.lines[currentMeasurement.lines.length - 1] || null;
+
+        // If all points are removed, reset measurement
+        if (currentMeasurement.points.length === 0) {
+            clearMeasurement();
+        }
+    }
 }
 
 // Function to measure distance between two points
@@ -152,18 +218,35 @@ function calculateDistance(pointA, pointB) {
     return pointA.distanceTo(pointB); // Returns the distance between two points
 }
 
-// Add CSS2DObject Label between points
-export function addLabel(points) {
-    // Iterate through the points to create labels for each segment
-    for (let i = 0; i < points.length - 1; i++) {
-        const start = new THREE.Vector3(points[i].x, points[i].y, points[i].z);
-        const end = new THREE.Vector3(points[i + 1].x, points[i + 1].y, points[i + 1].z);
+export function addLabel(measurementGroup = null) {
+    let lines;
+    if (measurementGroup) {
+        // For saved measurements
+        lines = measurementGroup.children.filter(child => child.userData.type === 'measurementLine');
+        console.log("lines", lines);
+    } else {
+        // For current measurement
+        lines = currentMeasurement.lines;
+        console.log("Current Measurement lines to label", lines);
+    }
 
-        // Calculate the distance between the two points
+    lines.forEach((line, index) => {
+        console.log("line", line);
+        const start = line.userData.start;
+        console.log("start", start);
+        const end = line.userData.end;
+        console.log("end", end);
+
+        if (!start || !end) {
+            console.warn('Line missing start or end point', line);
+            return; // Skip this line if start or end is missing
+        }
+
         const distance = start.distanceTo(end);
-        const innerText = `${distance.toFixed(2)} m`; // Format the distance
+        console.log("distance", distance);
+        const innerText = `${distance.toFixed(2)} m`;
+        console.log("innerText", innerText);
 
-        // Create a div for the label
         const measurementDiv = document.createElement('div');
         measurementDiv.className = 'measurementLabel';
         measurementDiv.style.backgroundColor = '#fff';
@@ -171,20 +254,21 @@ export function addLabel(points) {
         measurementDiv.style.borderRadius = '5px';
         measurementDiv.style.padding = '5px';
         measurementDiv.style.fontFamily = 'Arial, sans-serif';
-        measurementDiv.pointerEvents = 'auto';
+        measurementDiv.style.pointerEvents = 'none';
         measurementDiv.innerText = innerText;
 
-        // Calculate the midpoint of the line segment
         const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-
-        const offsetY = 1; // Adjust this value to move the label higher or lower
+        console.log("midPoint", midPoint);
+        const offsetY = 1;
         const measurementLabel = new CSS2DObject(measurementDiv);
-        measurementLabel.position.set(midPoint.x, midPoint.y + offsetY, midPoint.z); // Adjust y position
+        measurementLabel.position.y += offsetY;
 
-        // Add the label to the scene
-        scene.add(measurementLabel);
-        measurementLabels.push(measurementLabel); // Store the label reference
-    }
+        if (!measurementGroup) {
+            measurementLabel.position.copy(midPoint);
+        }
+
+        line.add(measurementLabel); // Attach the label to the line
+    });
 }
 
 function populateMeasurementContainer(currentMeasurement) {
@@ -229,6 +313,23 @@ function populateMeasurementContainer(currentMeasurement) {
          sidebar.appendChild(buttonContainer);
      }
  
+     // Undo button
+    let undoButton = document.getElementById('undoMeasurement');
+    if (!undoButton) {
+        undoButton = document.createElement('a');
+        undoButton.href = '#';
+        undoButton.id = 'undoMeasurement';
+        undoButton.className = 'btn btn-sm btn-warning align-self-end';
+        undoButton.innerText = 'Undo';
+        undoButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            undoLastPoint();
+        });
+        if (currentMeasurement.points.length >= 2) {
+            buttonContainer.appendChild(undoButton);
+        }
+    }
+
      // Clear button
      let clearMeasurementButton = document.getElementById('clearMeasurement');
      if (!clearMeasurementButton) {
@@ -263,95 +364,6 @@ function populateMeasurementContainer(currentMeasurement) {
          });
          buttonContainer.appendChild(saveMeasurementButton);
      }
-}
-
-// Function to open the save modal
-function openSaveModal(currentMeasurement) {
-    console.log("totalDistance", currentMeasurement.totalDistance);
-    // Clear previous values in the modal
-    const pointContainer = document.getElementById('pointsContainer');
-    pointContainer.innerHTML = ''; // Clear existing points
-
-    // Populate the modal fields with points
-    currentMeasurement.points.forEach((point, index) => {
-        // Create input fields for each point
-        const pointDiv = document.createElement('div');
-        pointDiv.className = 'point-input';
-
-        pointDiv.innerHTML = `
-            <label>Point ${index + 1}:</label>
-            <div class="row">
-                <div class="col">
-                    <div class="input-group mb-3">
-                        <span class="input-group-text">x</span>
-                        <input type="number" class="form-control" id="point${index + 1}_x" value="${point.x.toFixed(2)}" required>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="input-group mb-3">
-                        <span class="input-group-text">y</span>
-                        <input type="number" class="form-control" id="point${index + 1}_y" value="${point.y.toFixed(2)}" required>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="input-group mb-3">
-                        <span class="input-group-text">z</span>
-                        <input type="number" class="form-control" id="point${index + 1}_z" value="${point.z.toFixed(2)}" required>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        pointContainer.appendChild(pointDiv);
-    });
-
-    // Set the distance value, ensuring totalDistance is a number
-    document.getElementById('total_distance').value = parseFloat(currentMeasurement.totalDistance).toFixed(2); // Format to 2 decimal places
-
-    // Show the modal
-    const saveMeasurementModal = new bootstrap.Modal(document.getElementById('saveMeasurementModal'));
-    saveMeasurementModal.show();
-
-    // Add event listener for form submission
-    const saveMeasurementForm = document.getElementById('saveMeasurementForm');
-    saveMeasurementForm.onsubmit = function(event) {
-        event.preventDefault(); // Prevent default form submission
-
-        // Create an object to hold the form data
-        const formData = {
-            name: document.getElementById('measurementName').value,
-            total_distance: document.getElementById('total_distance').value,
-            points: [] // Initialize an array for points
-        };
-
-        // Collect points from the modal inputs
-        currentMeasurement.points.forEach((_, index) => {
-            formData.points.push({
-                x: parseFloat(document.getElementById(`point${index + 1}_x`).value),
-                y: parseFloat(document.getElementById(`point${index + 1}_y`).value),
-                z: parseFloat(document.getElementById(`point${index + 1}_z`).value)
-            });
-        });
-
-        console.log('Form Data:', formData);
-        // Send the data using Axios
-        axios.post(saveMeasurementForm.action, formData, {
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') // Include CSRF token
-            }
-        })
-        .then(response => {
-            console.log('Measurement saved:', response.data);
-            // Close the modal and clear the form
-            saveMeasurementModal.hide();
-            clearMeasurement(); // Clear the measurement points if needed
-            // Fetch and display the newly saved measurement
-            fetchAndDisplaySavedMeasurements(); // Call this function to update the UI
-        })
-        .catch(error => {
-            console.error('Error saving measurement:', error);
-        });
-    };
 }
 
 // Function to draw a polygon around the selected points
@@ -413,29 +425,37 @@ export function populateAreaMeasurementContainer(area) {
 
 // Function to clear all measurements
 export function clearMeasurement() {
-    console.log("Clearing measurement: areaPoints: ", areaPoints, "line: ", line, "polygon: ", polygon, "measurementLabel: ", measurementLabel, "currentMeasurement.dots: ", currentMeasurement.dots, "currentMeasurement: ", currentMeasurement);
+    console.log("Clearing measurement: areaPoints: ", areaPoints, "polygon: ", polygon, "measurementLabel: ", measurementLabel, "currentMeasurement.dots: ", currentMeasurement.dots, "currentMeasurement: ", currentMeasurement);
     
-    // Clear area points
-    areaPoints = [];
-    
-    // Remove the current line if it exists
-    if (line) {
-        scene.remove(line); // Ensure the line is removed from the scene
-        line = null; // Clear the reference
-    }
-    
-    // Remove other objects
-    if (polygon) scene.remove(polygon);
-    currentMeasurement.dots.forEach(dot => scene.remove(dot));
-    
-    // Clear measurement data
-    currentMeasurement = { points: [], distances: [], totalDistance: 0, dots: [] }; // Reset current measurement
     hasActiveMeasurement = false;
+    hasAreaMeasurement = false;
     enableMeasurement = false;
     enableAreaMeasurement = false;
-    measurementLabels.forEach(label => scene.remove(label));
-    measurementLabels = [];
+    areaPoints = [];  // Clear area points
+    areaDots.forEach(dot => scene.remove(dot));
     
+    if (polygon) scene.remove(polygon);  // Remove area polygon
+
+    // Clear currentMeasurement data
+    console.log("Clearing currentMeasurement: ", currentMeasurement);
+    currentMeasurement.dots.forEach(dot => scene.remove(dot));
+    // Remove all lines and their labels
+      currentMeasurement.lines.forEach(line => {
+        removeLabelsFromLine(line);
+        scene.remove(line);
+    });
+    currentMeasurement = { 
+        points: [], 
+        distances: [], 
+        totalDistance: 0, 
+        dots: [], 
+        lines: [],
+        lastPoint: null,
+        lastDot: null,
+        lastLine: null,
+        lastDistance: 0
+    };
+
     // Clear the measurement container content
     if (measurementContainer) {
         measurementContainer.innerHTML = ''; // Clear the content of the measurement container
@@ -446,6 +466,7 @@ export function clearMeasurement() {
         const sidebar = document.getElementById('newMeasurementSidebar');
         sidebar.classList.add('d-none'); // Hide the sidebar if no measurements exist
     }
+    // alert('Alert clearMeasurement');
 }
 
 // Function to fetch and display saved measurements
@@ -470,15 +491,17 @@ export function fetchAndDisplaySavedMeasurements() {
 function displaySavedMeasurement(measurement) {
     // Create a group to hold the line and dots
     const measurementGroup = new THREE.Group();
+    measurementGroup.name = measurement.name;
+    measurementGroup.userData.type = "measurementGroup";
     measurementGroup.userData.measurementId = measurement.id; // Store the measurement ID in the group
+    measurementGroup.userData.colour = measurement.colour;
+    measurementGroup.userData.name = measurement.name;
+    measurementGroup.userData.totalDistance = measurement.total_distance;
 
     // Create an array to hold the points for the line
     const pointsArray = measurement.points.map(point => 
         new THREE.Vector3(point.x, point.y, point.z)
     );
-
-    // Check if there are enough points to draw a line
-    if (pointsArray.length < 2) return; // Need at least two points to draw a line
 
     // Iterate through the points to create cylinders between each pair of points
     for (let i = 0; i < pointsArray.length - 1; i++) {
@@ -491,9 +514,9 @@ function displaySavedMeasurement(measurement) {
 
         // Create a cylinder geometry
         const geometry = new THREE.CylinderGeometry(0.09, 0.09, length, 8); // Radius and segments
-
+        console.log("measurement.colour", measurement.colour);
         // Create a material for the cylinder
-        const material = new THREE.MeshStandardMaterial({ color: 0x0000ff }); // Blue color for saved measurements
+        const material = new THREE.MeshStandardMaterial({ color: measurement.colour }); // Blue color for saved measurements
 
         // Create the cylinder mesh
         const line = new THREE.Mesh(geometry, material);
@@ -508,6 +531,10 @@ function displaySavedMeasurement(measurement) {
         // Set user data for the line
         line.userData.type = "measurementLine"; // Set user data for identification
         line.userData.measurementId = measurement.id; // Store the measurement ID in the line's userData
+        line.userData.start = start;
+        line.userData.end = end;    
+        line.userData.name = measurement.name;
+        line.userData.length = length;
         
         // Add the cylinder to the measurement group
         measurementGroup.add(line);
@@ -515,16 +542,13 @@ function displaySavedMeasurement(measurement) {
 
     // Add dot markers at the start and end points
     pointsArray.forEach(point => {
-        const dot = addDot(point, 0x0000ff); // Add a blue dot at each point
+        const dot = addDot(point, measurement.colour); // Add a blue dot at each point
         measurementGroup.add(dot); // Add the dot to the measurement group
     });
 
     // Add the measurement group to the scene
     scene.add(measurementGroup);
     objectsToIntersect.push(measurementGroup); // Add the group to objectsToIntersect for selection
-
-    // Call addLabel to display distances between points
-    // addLabel(pointsArray);
 }
 
 // Function to add saved measurement details to the sidebar
@@ -553,4 +577,74 @@ function addSavedMeasurementToSidebar(measurement) {
     savedMeasurementsContent.appendChild(measurementContainer);
 
     measurementIndex++; // Increment the counter after each call
+}
+
+export function addMeasurement(currentMeasurement) {
+    openSaveModal(currentMeasurement);
+}
+
+export function editMeasurement(measurementGroup) {
+    openEditMeasurementModal(measurementGroup);
+}
+
+export function deleteMeasurement(measurementGroup) {
+    const measurementId = measurementGroup.userData.measurementId;
+    deleteMeasurementRequest(measurementId)
+        .then(response => {
+            console.log('Measurement deleted:', response.data);
+            removeMeasurementFromScene(measurementGroup);
+            removeMeasurementFromSidebar(measurementId);
+            removeMeasurementLabels(measurementGroup)
+            showMessage('Measurement deleted successfully');
+        })
+        .catch(error => {
+            console.error('Error deleting measurement:', error);
+            showMessage('Error deleting measurement', 'error');
+        });
+}
+
+export function updateMeasurement(measurementId, formData) {
+    updateMeasurementRequest(measurementId, formData)
+        .then(response => {
+            console.log('Measurement updated:', response.data);
+            removeBackdrop();
+            // Update the measurement in the scene and sidebar if necessary
+            showMessage('Measurement updated successfully');
+        })
+        .catch(error => {
+            console.error('Error updating measurement:', error);
+            showMessage('Error updating measurement', 'error');
+        });
+}
+
+function removeMeasurementFromScene(measurementGroup) {
+    scene.remove(measurementGroup);
+    const index = objectsToIntersect.indexOf(measurementGroup);
+    if (index > -1) {
+        objectsToIntersect.splice(index, 1);
+    }
+}
+
+function removeMeasurementFromSidebar(measurementId) {
+    const measurementContainer = document.querySelector(`.measurementText[data-measurement-id="${measurementId}"]`);
+    if (measurementContainer) {
+        measurementContainer.remove();
+    }   
+}
+
+// Remove labels from all measurement lines
+export function removeMeasurementLabels(measurementGroup) {
+    console.log("removeMeasurementLabels", measurementGroup);
+    measurementGroup.traverse((object) => {
+        if (object.userData.type === 'measurementLine') {
+            object.children = object.children.filter(child => {
+                if (child.isCSS2DObject) {
+                    console.log("removing label", child);  
+                    object.remove(child);
+                    return false;
+                }
+                return true;
+            });
+        }
+    });
 }

@@ -1,4 +1,5 @@
 import './bootstrap';
+import 'bootstrap';
 import '../css/app.css';
 import {
     scene, 
@@ -7,8 +8,8 @@ import {
     addLights, 
     setupOrbitControls, 
     animate, 
-    handleResize
 } from './scene.js';
+// import '@/alertHandler.js';
 import { fetchAndDisplaySavedMeasurements } from './measurements.js';
 import { createAndRenderHouse } from './house.js';
 import { loadTreeModel } from './tree.js';
@@ -35,12 +36,12 @@ async function init() {
     setupEventListeners();
     fetchAndDisplaySavedMeasurements()
 
-        // Add the WebGL context lost event listener
-        canvas.addEventListener('webglcontextlost', function(event) {
-            event.preventDefault();
-            console.log('WebGL context lost');
-            // Handle context loss (e.g., reset the scene)
-        }, false);
+        // // Add the WebGL context lost event listener
+        // canvas.addEventListener('webglcontextlost', function(event) {
+        //     event.preventDefault();
+        //     console.log('WebGL context lost');
+        //     // Handle context loss (e.g., reset the scene)
+        // }, false);
 }
 
 init();

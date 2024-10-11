@@ -1,8 +1,10 @@
 import { onKeyDown, onKeyUp } from './keyHandlers.js';
 import { onMouseMove, onMouseClick } from './mouseHandlers.js';
-import { handleResize } from './scene.js';
+import { selectedObject } from './select.js';
 import { loadPanel1, loadPanel2 } from './panels.js'; // Import panel loading functions
-import { scene, checkIntersection, objectsToIntersect } from './scene.js'; // Combined import
+import { scene, handleResize, objectsToIntersect } from './scene.js';
+import { deleteMeasurement, editMeasurement } from './measurements.js';
+
 
 export function setupEventListeners() {
     // console.log("Setting up event listeners");
@@ -44,71 +46,55 @@ export function setupEventListeners() {
     });
 
     // Context Menu Event Listener
-    document.addEventListener('contextmenu', function(event, selectedObject) {
-    event.preventDefault(); // Prevent the default context menu
-
-    const intersect = checkIntersection(event); // Check if a measurement is clicked
-        if (intersect) {
-            const targetObject = intersect.object;
-
-            // Check if the target object is part of a measurement group
-            if (targetObject.userData.type === 'measurementLine' || targetObject.userData.type === 'dot') {
-                const measurementGroup = targetObject.parent; // Get the parent group
-                console.log("measurementGroup.userData", measurementGroup.userData);
-                // Show the context menu at the mouse position
-                const contextMenu = document.getElementById('contextMenu');
-                contextMenu.style.display = 'block';
-                contextMenu.style.left = `${event.pageX}px`;
-                contextMenu.style.top = `${event.pageY}px`;
-
-                // Store the measurement group for deletion
-                contextMenu.dataset.measurementId = measurementGroup.userData.measurementId;
-            }
+    document.addEventListener('contextmenu', function(event) {
+        event.preventDefault(); // Prevent the default context menu
+        console.log("Context menu event listener");
+        console.log(selectedObject);
+        if (selectedObject) {
+            showContextMenu(event, selectedObject);
         }
     });
 
     // Hide the context menu when clicking elsewhere
     document.addEventListener('click', function() {
-        const contextMenu = document.getElementById('contextMenu');
-        contextMenu.style.display = 'none';
+        hideContextMenu();
     });
 
-    document.getElementById('deleteMeasurement').addEventListener('click', function() {
+    function showContextMenu(event, object) {
         const contextMenu = document.getElementById('contextMenu');
-        const measurementId = contextMenu.dataset.measurementId; // Get the measurement ID
-    
-        if (measurementId) {
-            // Send a request to delete the measurement from the database
-            axios.delete(`/api/measurements/${measurementId}`)
-                .then(response => {
-                    console.log('Measurement deleted:', response.data);
-    
-                    // Find the measurement group by userData.measurementId
-                    const measurementGroup = scene.children.find(child => 
-                        child.userData.measurementId == measurementId // Match the measurement ID
-                    );
-                    // Remove the group from the scene
-                    if (measurementGroup) {
-                        scene.remove(measurementGroup); // Remove the group from the scene
-                        console.log("Measurement group removed from scene:", measurementGroup);
-                    } else {
-                        console.warn("Measurement group not found in scene for ID:", measurementId);
-                    }
-                     // Remove the corresponding measurement container from the sidebar
-                    const measurementContainer = document.querySelector(`.measurementText[data-measurement-id="${measurementId}"]`);
-                    if (measurementContainer) {
-                        measurementContainer.remove(); // Remove the container from the sidebar
-                        console.log("Measurement container removed from sidebar:", measurementContainer);
-                    } else {
-                        console.warn("Measurement container not found in sidebar for ID:", measurementId);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error deleting measurement:', error);
-                });
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = `${event.pageX}px`;
+        contextMenu.style.top = `${event.pageY}px`;
+
+        // Clear existing menu items
+        contextMenu.innerHTML = '';
+
+        // Add menu items based on the object type
+        if (object.userData.type === 'measurementGroup') {
+            addMenuItem(contextMenu, 'Edit', () => editMeasurement(object));
+            addMenuItem(contextMenu, 'Delete', () => deleteMeasurement(object));
         }
-    
-        // Hide the context menu
+        // Add more object types here as needed
+        // else if (object.userData.type === 'someOtherType') {
+        //     addMenuItem(contextMenu, 'Some Action', () => someAction(object));
+        // }
+    }
+
+    function hideContextMenu() {
+        const contextMenu = document.getElementById('contextMenu');
         contextMenu.style.display = 'none';
-    });
+    }
+
+    function addMenuItem(menu, text, onClick) {
+        const item = document.createElement('div');
+        item.textContent = text;
+        item.classList.add('context-menu-item');
+        item.style.padding = '10px';
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => {
+            onClick();
+            hideContextMenu();
+        });
+        menu.appendChild(item);
+    }
 }
